@@ -122,7 +122,7 @@ Claude Code に **AWS MCP Server**（2026 年 GA）を接続し、開発効率�
 プロジェクトディレクトリ直下に `.mcp.json` を作成します。
 
 ```bash
-curl -o .mcp.json https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/.mcp.json
+curl -o .mcp.json https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/mcp.json
 ```
 
 または、Claude Code のコマンドで直接追加することもできます（ユーザースコープで全プロジェクト利用可）。
