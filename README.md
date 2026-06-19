@@ -2,118 +2,46 @@
 
 Claude Code on Amazon Bedrock を使って AI エージェントを開発します。
 
+> ℹ️ **Claude Code 本体のインストールと Amazon Bedrock への接続設定は、ワークショップ環境（VS Code Server）に事前セットアップ済みです。** このガイドでは、AWS 認証情報の設定・MCP サーバー・プロジェクトルールの 3 点だけを準備します。
+
 ## 前提条件
 
-- AWS アカウント（マネジメントコンソールにログインできること）
-- VS Code Server（ブラウザで開ける状態）
+- AWS マネジメントコンソールにログインできること
+- VS Code Server（ブラウザで開ける状態。Claude Code セットアップ済み）
 
 ---
 
-## 準備 1 / 5：アクセスキーの発行（AWS CloudShell）
+## 準備 1 / 3：AWS 認証情報の設定
 
-AWS CloudShell でスクリプトを実行し、IAM ユーザー・ポリシー・アクセスキーを一括作成します。
-
-### 手順
-
-1. マネジメントコンソールの検索バーで「**CloudShell**」を検索 → 開く
-2. 以下のコマンドを順番に実行
-
-```bash
-git clone https://github.com/nemf/ai-agent-workshop.git
-cd ai-agent-workshop
-chmod +x script.sh
-./script.sh
-```
-
-4. 出力された **AccessKeyId** と **SecretAccessKey** をメモ・保存
-
-```json
-{
-  "AccessKey": {
-    "UserName": "bedrock-agent-dev",
-    "AccessKeyId": "AKIA...",
-    "SecretAccessKey": "...",
-    "Status": "Active"
-  }
-}
-```
-
-> ⚠️ **SecretAccessKey は再表示できません。** スクリプト実行直後に必ずメモしてください。紛失した場合はキーを削除して再発行が必要です。
-
-### スクリプトが自動で行うこと
-
-| ステップ | 内容 |
-|---------|------|
-| 1 | IAM ユーザー `bedrock-agent-dev` を作成 |
-| 2 | カスタムポリシー `AIAgentWorkshopPolicy` を作成 |
-| 3 | ポリシーをユーザーにアタッチ |
-| 4 | アクセスキーを発行 |
-
----
-
-## 準備 2 / 5：AWS CLI の設定（VS Code Server）
-
-VS Code Server のターミナルでアクセスキーを登録します。
+マネジメントコンソールの「**Get credentials**」で取得した認証情報を、VS Code Server に設定します。
 
 ### 手順
 
-1. VS Code Server をブラウザで開く
-2. 上部メニュー「**ターミナル**」→「**新しいターミナル**」
-3. 以下を実行
+1. マネジメントコンソール（または Workshop Studio）の「**Get credentials**」を開く
+2. 表示された認証情報をコピーする（`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`）
+3. VS Code Server のターミナル（上部メニュー「**ターミナル**」→「**新しいターミナル**」）を開く
+4. 「Get credentials」に表示された export 文をそのまま貼り付けて実行
 
 ```bash
-aws configure --profile bedrock-dev
+export AWS_ACCESS_KEY_ID="ASIA..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_SESSION_TOKEN="..."
+export AWS_REGION="us-west-2"
 ```
 
-4. 4 つの質問に回答
+> 💡 「Get credentials」の表示形式は環境によって異なります（`~/.aws/credentials` への貼り付け形式の場合もあります）。画面の案内に従ってください。一時認証情報のため、有効期限が切れたら再取得します。
 
-| 質問 | 入力する値 |
-|------|-----------|
-| AWS Access Key ID | CloudShell で取得した `AKIA...` |
-| AWS Secret Access Key | CloudShell で取得したシークレットキー |
-| Default region name | `us-west-2` |
-| Default output format | `json` |
-
-5. プロファイルを有効化
-
-```bash
-export AWS_PROFILE=bedrock-dev
-```
-
-6. （推奨）ターミナル起動時に自動で有効化
-
-```bash
-echo 'export AWS_PROFILE=bedrock-dev' >> ~/.bashrc
-source ~/.bashrc
-```
-
-7. 設定確認
+5. 設定確認
 
 ```bash
 aws sts get-caller-identity
 ```
 
-`"Arn"` に `bedrock-agent-dev` が含まれていれば OK。
+`Account` と `Arn` が表示されれば OK。
 
 ---
 
-## 準備 3 / 5：Claude Code のインストールと Bedrock 接続設定
-
-Claude Code は Amazon Bedrock 経由で利用します。インストールと環境設定の手順は、以下の公式ワークショップに従ってください。
-
-> 📘 **Claude Code on Amazon Bedrock**
-> https://catalog.workshops.aws/claude-code-on-amazon-bedrock/ja-JP/lab-1/environment-configuration
-
-ポイント:
-
-- Bedrock を使うため、`CLAUDE_CODE_USE_BEDROCK=1` と `AWS_REGION=us-west-2` を設定します（詳細は上記ワークショップ参照）。
-- **Amazon Q Developer のような SSO 認証（`*.awsapps.com` へのアクセス）は不要です。** 準備 2 で設定した IAM アクセスキー（`bedrock-dev` プロファイル）の認証情報をそのまま利用します。
-
-設定が完了したら、ターミナルで `claude` を起動して動作を確認してください。
-
----
-
-## 準備 4 / 5：MCP サーバーの設定
+## 準備 2 / 3：MCP サーバーの設定
 
 Claude Code に **AWS MCP Server**（2026 年 GA）を接続し、開発効率を上げます。AWS の API 実行・ドキュメント検索・スクリプト実行をこの 1 つのサーバーでまかなえます。
 
@@ -122,7 +50,7 @@ Claude Code に **AWS MCP Server**（2026 年 GA）を接続し、開発効率�
 プロジェクトディレクトリ直下に `.mcp.json` を作成します。
 
 ```bash
-curl -o .mcp.json https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/mcp.json
+curl -o .mcp.json https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/.mcp.json
 ```
 
 または、Claude Code のコマンドで直接追加することもできます（ユーザースコープで全プロジェクト利用可）。
@@ -154,7 +82,7 @@ claude mcp add-json aws-mcp --scope user \
 |------|------|
 | サーバー | AWS MCP Server（マネージドリモート） |
 | 主なツール | `call_aws`（15,000 以上の AWS API を実行）、`search_documentation` / `read_documentation`（最新ドキュメント取得）、`run_script`（サンドボックスで Python 実行） |
-| 認証 | 準備 2 で設定した IAM 認証情報（SigV4）を `mcp-proxy-for-aws` が橋渡し。ドキュメント取得は認証不要 |
+| 認証 | 準備 1 で設定した AWS 認証情報（SigV4）を `mcp-proxy-for-aws` が橋渡し。ドキュメント取得は認証不要 |
 
 > 💡 AWS MCP Server は AgentCore のドキュメント検索、CDK/CloudFormation 操作、AWS API 実行を 1 つに集約しています。AgentCore のデプロイや Lambda・DynamoDB のインフラ操作もこのサーバーから行えます。
 
@@ -164,7 +92,7 @@ Claude Code を再起動し、`/mcp` と入力して `aws-mcp` が接続済み�
 
 ---
 
-## 準備 5 / 5：CLAUDE.md の設定
+## 準備 3 / 3：CLAUDE.md の設定
 
 プロジェクトルールを定義して、Claude Code にプロジェクトの文脈を理解させます。
 
@@ -193,7 +121,7 @@ curl -o CLAUDE.md https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/
 
 準備が完了したら、以下を確認してください。
 
-- [ ] `aws sts get-caller-identity` で `bedrock-agent-dev` が表示される
+- [ ] `aws sts get-caller-identity` で認証情報が表示される
 - [ ] `claude` を起動でき、Bedrock 経由で応答が返る
 - [ ] `/mcp` で `aws-mcp` が接続済みと表示される
 - [ ] `.mcp.json` がプロジェクト直下にある
