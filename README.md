@@ -1,4 +1,6 @@
-# AI エージェントワークショップ — 環境準備ガイド
+# AI エージェントワークショップ — 環境準備ガイド（Claude Code 版）
+
+Claude Code on Amazon Bedrock を使って AI エージェントを開発します。
 
 ## 前提条件
 
@@ -69,7 +71,7 @@ aws configure --profile bedrock-dev
 |------|-----------|
 | AWS Access Key ID | CloudShell で取得した `AKIA...` |
 | AWS Secret Access Key | CloudShell で取得したシークレットキー |
-| Default region name | `us-east-1` |
+| Default region name | `us-west-2` |
 | Default output format | `json` |
 
 5. プロファイルを有効化
@@ -95,78 +97,83 @@ aws sts get-caller-identity
 
 ---
 
-## 準備 3 / 5：Amazon Q 認証設定
+## 準備 3 / 5：Claude Code のインストールと Bedrock 接続設定
 
-ワークショップ説明資料の環境準備の手順に従って、Amazon Q の認証設定を完了させてください。
+Claude Code は Amazon Bedrock 経由で利用します。インストールと環境設定の手順は、以下の公式ワークショップに従ってください。
+
+> 📘 **Claude Code on Amazon Bedrock**
+> https://catalog.workshops.aws/claude-code-on-amazon-bedrock/ja-JP/lab-1/environment-configuration
+
+ポイント:
+
+- Bedrock を使うため、`CLAUDE_CODE_USE_BEDROCK=1` と `AWS_REGION=us-west-2` を設定します（詳細は上記ワークショップ参照）。
+- **Amazon Q Developer のような SSO 認証（`*.awsapps.com` へのアクセス）は不要です。** 準備 2 で設定した IAM アクセスキー（`bedrock-dev` プロファイル）の認証情報をそのまま利用します。
+
+設定が完了したら、ターミナルで `claude` を起動して動作を確認してください。
+
+---
 
 ## 準備 4 / 5：MCP サーバーの設定
 
-Amazon Q Developer に 3 つの MCP サーバーを接続し、開発効率を上げます。
+Claude Code に **AWS MCP Server**（2026 年 GA）を接続し、開発効率を上げます。AWS の API 実行・ドキュメント検索・スクリプト実行をこの 1 つのサーバーでまかなえます。
 
 ### 手順
 
-プロジェクトディレクトリ直下に `.amazonq/mcp.json` を作成します。
+プロジェクトディレクトリ直下に `.mcp.json` を作成します。
 
 ```bash
-mkdir -p .amazonq
-curl -o .amazonq/mcp.json https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/mcp.json
+curl -o .mcp.json https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/.mcp.json
 ```
 
-#### 設定内容
+または、Claude Code のコマンドで直接追加することもできます（ユーザースコープで全プロジェクト利用可）。
+
+```bash
+claude mcp add-json aws-mcp --scope user \
+  '{"command":"uvx","args":["mcp-proxy-for-aws@latest","https://aws-mcp.us-east-1.api.aws/mcp","--metadata","AWS_REGION=us-west-2"]}'
+```
+
+#### 設定内容（`.mcp.json`）
 
 ```json
 {
   "mcpServers": {
-    "aws-knowledge": {
-      "url": "https://knowledge-mcp.global.api.aws",
-      "type": "http",
-      "disabled": false,
-      "autoApprove": ["*"]
-    },
-    "bedrock-agentcore": {
+    "aws-mcp": {
       "command": "uvx",
-      "args": ["awslabs.amazon-bedrock-agentcore-mcp-server@latest"],
-      "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "autoApprove": ["*"]
-    },
-    "aws-iac": {
-      "command": "uvx",
-      "args": ["awslabs.aws-iac-mcp-server@latest"],
-      "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "autoApprove": ["*"]
+      "args": [
+        "mcp-proxy-for-aws@latest",
+        "https://aws-mcp.us-east-1.api.aws/mcp",
+        "--metadata",
+        "AWS_REGION=us-west-2"
+      ]
     }
   }
 }
 ```
 
-| サーバー | 種類 | 用途 |
-|---------|------|------|
-| AWS Knowledge | ☁ リモート | AWS ドキュメント・What's New・Blog・Agent SOPs |
-| Bedrock AgentCore | ローカル | AgentCore ドキュメント検索 + クラウドブラウザツール |
-| AWS IaC | ローカル | CDK/CloudFormation テンプレート検証・ベストプラクティス |
+| 項目 | 内容 |
+|------|------|
+| サーバー | AWS MCP Server（マネージドリモート） |
+| 主なツール | `call_aws`（15,000 以上の AWS API を実行）、`search_documentation` / `read_documentation`（最新ドキュメント取得）、`run_script`（サンドボックスで Python 実行） |
+| 認証 | 準備 2 で設定した IAM 認証情報（SigV4）を `mcp-proxy-for-aws` が橋渡し。ドキュメント取得は認証不要 |
 
-> 💡 こちらは、今回のワークショップで有用であろうもののサンプルとなります。 [Open source MCP servers for AWS](https://github.com/awslabs/mcp) にも、いろいろAWSが提供しているMCPサーバがありますので、ご参考になり、追加等ご自由に
+> 💡 AWS MCP Server は AgentCore のドキュメント検索、CDK/CloudFormation 操作、AWS API 実行を 1 つに集約しています。AgentCore のデプロイや Lambda・DynamoDB のインフラ操作もこのサーバーから行えます。
 
 ### 反映
 
-VS Code のコマンドパレット（`Ctrl+Shift+P`）→ 「**Reload Window**」で Q Developer を再起動。
+Claude Code を再起動し、`/mcp` と入力して `aws-mcp` が接続済みであることを確認します。
 
 ---
 
-## 準備 5 / 5：amazonq.md の設定
+## 準備 5 / 5：CLAUDE.md の設定
 
-プロジェクトルールを定義して、Q Developer にプロジェクトの文脈を理解させます。
+プロジェクトルールを定義して、Claude Code にプロジェクトの文脈を理解させます。
 
 ### 手順
 
-プロジェクトディレクトリ直下に `amazonq.md` を配置します。
+プロジェクトディレクトリ直下に `CLAUDE.md` を配置します。
 
 ```bash
-curl -o amazonq.md https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/amazonq.md
+curl -o CLAUDE.md https://raw.githubusercontent.com/nemf/ai-agent-workshop/main/CLAUDE.md
 ```
 
 #### 主な設定内容
@@ -177,8 +184,9 @@ curl -o amazonq.md https://raw.githubusercontent.com/nemf/ai-agent-workshop/main
 - **コーディング規約** — Python 3.12+、型ヒント必須、ruff format/check
 - **モデル** — Claude Opus 4.6（`us.anthropic.claude-opus-4-6-v1`）
 
-> 💡 `amazonq.md` はプロジェクトのルールブック。Q Developer がこのファイルを読んで、プロジェクトの文脈を理解した上でコードを書いてくれます。
+> 💡 `CLAUDE.md` はプロジェクトのルールブック。Claude Code がこのファイルを読んで、プロジェクトの文脈を理解した上でコードを書いてくれます。
 > こちらの内容はサンプルですので、適宜編集してご利用ください。
+
 ---
 
 ## チェックリスト
@@ -186,7 +194,9 @@ curl -o amazonq.md https://raw.githubusercontent.com/nemf/ai-agent-workshop/main
 準備が完了したら、以下を確認してください。
 
 - [ ] `aws sts get-caller-identity` で `bedrock-agent-dev` が表示される
-- [ ] `.amazonq/mcp.json` がプロジェクト直下にある
-- [ ] `amazonq.md` がプロジェクト直下にある
+- [ ] `claude` を起動でき、Bedrock 経由で応答が返る
+- [ ] `/mcp` で `aws-mcp` が接続済みと表示される
+- [ ] `.mcp.json` がプロジェクト直下にある
+- [ ] `CLAUDE.md` がプロジェクト直下にある
 
 すべて ✓ なら準備完了です。ワークショップを始めましょう！
